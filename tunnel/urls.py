@@ -1,4 +1,4 @@
-"""tunneling URL Configuration
+"""tunnel URL Configuration
 
 The `urlpatterns` list routes URLs to views. For more information please see:
     https://docs.djangoproject.com/en/1.11/topics/http/urls/
@@ -23,8 +23,10 @@ from logging.handlers import SMTPHandler
 import os
 from subprocess import Popen, PIPE
 
-from tunneling import views
-from tunneling.models import Tunnels
+from tunnel import views
+from tunnel.models import Tunnels
+
+log = logging.getLogger('Tunnel')
 
 urlpatterns = [
     path("api/health", views.Health.as_view(), name="health"),
@@ -32,8 +34,11 @@ urlpatterns = [
     path("api/loglevel/<str:loglevel>", views.LogLevel.as_view()),
     path("api/available/<str:node>", views.Available.as_view()),
     path("api/remote/<str:node>/", views.Remote.as_view(), name="remote"),
+    path("api/remote/<str:node>", views.Remote.as_view(), name="remote"),
     path("api/tunnel/<str:servername>/", views.Tunnel.as_view(), name="tunnel"),
+    path("api/tunnel/<str:servername>", views.Tunnel.as_view(), name="tunnel"),
     path("api/tunnel/<str:servername>/<str:node>/<str:hostname>/<int:port1>/<int:port2>/", views.Tunnel.as_view(), name="tunnel"),
+    path("api/tunnel/<str:servername>/<str:node>/<str:hostname>/<int:port1>/<int:port2>", views.Tunnel.as_view(), name="tunnel"),
 ]
 
 
@@ -45,7 +50,7 @@ def setUpLogger():
     else:
         mail = []
 
-    logger = logging.getLogger('Tunneling')
+    logger = logging.getLogger('Tunnel')
     # In trace will be sensitive information like tokens
     logging.addLevelName(5, "TRACE")
     def trace_func(self, message, *args, **kws):
@@ -67,26 +72,15 @@ def setUpLogger():
     logger.addHandler(mail_handler)
 
 def setUpTunnels():
-    log = logging.getLogger('Tunneling')
     uuidcode = 'StartUp'
     log.info(f"uuidcode={uuidcode} - Start tunnels that are still in the database")
     tunnels = Tunnels.objects.all()
     for tunnel in tunnels:
         try:
             log.info(f"uuidcode={uuidcode} Start Tunnel for {tunnel.servername} {tunnel.node} {tunnel.hostname} {tunnel.port1} {tunnel.port2}")
-            cmd = ['lsof', '-t' , f'-i:{tunnel.port1}']
-            log.trace("uuidcode={uuidcode} Check if something is listening: {cmd}".format(uuidcode=uuidcode, cmd=' '.join(cmd)))
-            p = Popen(cmd, stderr=PIPE, stdout=PIPE)
-            p.communicate()
-            return_code = p.returncode
-            log.trace(f"uuidcode={uuidcode} Return Code: {return_code}")
-            if return_code == 0:
+            ret = tunnel.is_running(uuidcode)
+            if ret:
                 log.error(f"uuidcode={uuidcode} Something is already listening on port {tunnel.port1}")
-                continue
-            elif return_code == 1:
-                pass
-            else:
-                log.error(f"uuidcode={uuidcode} lsof finished with non expected exit code: {return_code}")
                 continue
             return_code = views.setup_tunnel(uuidcode, tunnel.node, tunnel.hostname, tunnel.port1, tunnel.port2)
             log.trace("uuidcode={uuidcode} Return Code: {return_code}")
@@ -99,7 +93,9 @@ def setUpTunnels():
     log.info(f"uuidcode={uuidcode} Tunnel rebuild finished")
 
 def setUp():
+    print("setUp")
     setUpLogger()
+    log.info("setup")
     setUpTunnels()
 
 setUp()

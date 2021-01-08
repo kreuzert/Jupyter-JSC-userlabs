@@ -8,38 +8,13 @@ from django.http import HttpResponse
 from django.http.response import HttpResponseBadRequest
 from rest_framework.views import APIView
 
-from tunneling.models import Tunnels
+from tunnel.models import Tunnels
 
 # import the logging library
 import logging
 
 # Get an instance of a logger
-log = logging.getLogger("Tunneling")
-
-
-def get_ssh_config_file():
-    return os.environ.get('SSHCONFIGFILE', '~/.ssh/config')
-
-
-def node_mapping(node):
-    log.trace(f"Node Mapping: {node}")
-    node_mapping_path = os.environ.get('NODEMAPPING_FILE', '')
-    if node_mapping_path:
-        with open(node_mapping_path, 'r') as f:
-            node_mapping = json.load(f)
-        node = node_mapping.get(node, node)
-        log.trace(f"Node Mapping return: {node}")
-        return node_mapping.get(node, node)
-    log.trace(f"Node Mapping return: {node}")
-    return node
-
-def setup_tunnel(uuidcode, node, hostname, port1, port2):
-    cmd = ['timeout' , os.environ.get('SSHTIMEOUT', "3"), 'ssh', '-F', get_ssh_config_file(), '-O', 'forward', f'tunnel_{node}', '-L', f'0.0.0.0:{port1}:{hostname}:{port2}']
-    log.trace("uuidcode={uuidcode} Create tunnel with: {cmd}".format(uuidcode=uuidcode, cmd=' '.join(cmd)))
-    p = Popen(cmd, stderr=PIPE, stdout=PIPE)
-    p.communicate()
-    return_code = p.returncode
-    return return_code        
+log = logging.getLogger("Tunnel")
 
 
 class LogLevel(APIView):
@@ -106,10 +81,9 @@ class Available(APIView):
         try:
             uuidcode = request.headers.get('uuidcode', '<no_uuidcode>')
             log.info(f"uuidcode={uuidcode} Check if {node} is available")
-            node = node_mapping(node)
             expected_output = os.environ.get("AVAILABLE_OUTPUT", "Jupyter-JSC: node is reachable")
             log.trace(f"uuidcode={uuidcode} expected output: {expected_output}")
-            cmd = ['ssh', '-F', get_ssh_config_file(), f"available_{node}"]
+            cmd = ['ssh', '-F', os.environ.get('SSHCONFIGFILE', '~/.ssh/config'), f"available_{node}"]
             try:
                 log.trace("uuidcode={uuidcode} Command: {cmd}".format(uuidcode=uuidcode, cmd=' '.join(cmd)))
                 output = check_output(cmd, stderr=STDOUT, timeout=int(os.environ.get('SSHTIMEOUT', 3)))  
@@ -132,8 +106,7 @@ class Remote(APIView):
         try:
             uuidcode = request.headers.get('uuidcode', '<no_uuidcode>')
             log.info(f"uuidcode={uuidcode} Get status of remote tunnel for {node}")
-            node = node_mapping(node)
-            cmd = ['timeout' , os.environ.get('SSHTIMEOUT', "3"), 'ssh', '-F', get_ssh_config_file(), f'remote_{node}', 'status']
+            cmd = ['timeout' , os.environ.get('SSHTIMEOUT', "3"), 'ssh', '-F', os.environ.get('SSHCONFIGFILE', '~/.ssh/config'), f'remote_{node}', 'status']
             log.trace("uuidcode={uuidcode} Check for Remote tunnel: {cmd}".format(uuidcode=uuidcode, cmd=' '.join(cmd)))
             p = Popen(cmd, stderr=PIPE, stdout=PIPE)
             p.communicate()
@@ -141,8 +114,6 @@ class Remote(APIView):
             running_code = int(os.environ.get("REMOTE_OK_CODE", 217))
             non_running_code = int(os.environ.get("REMOTE_NOT_OK_CODE", 218))
             log.trace(f"uuidcode={uuidcode} Exit code: {return_code}")
-            log.trace(f"uuidcode={uuidcode} Expected running exit code: {running_code}")
-            log.trace(f"uuidcode={uuidcode} Expected non running exit code: {non_running_code}")
             if return_code == running_code:
                 response = HttpResponse("True", status=200)
             elif return_code == non_running_code:
@@ -158,8 +129,7 @@ class Remote(APIView):
         try:
             uuidcode = request.headers.get('uuidcode', '<no_uuidcode>')
             log.info(f"uuidcode={uuidcode} Start remote tunnel for {node}")
-            node = node_mapping(node)
-            cmd = ['timeout' , os.environ.get('SSHTIMEOUT', "3"), 'ssh', '-F', get_ssh_config_file(), f'remote_{node}', 'start']
+            cmd = ['timeout' , os.environ.get('SSHTIMEOUT', "3"), 'ssh', '-F', os.environ.get('SSHCONFIGFILE', '~/.ssh/config'), f'remote_{node}', 'start']
             log.trace("uuidcode={uuidcode} Start Remote tunnel: {cmd}".format(uuidcode=uuidcode, cmd=' '.join(cmd)))
             p = Popen(cmd, stderr=PIPE, stdout=PIPE)
             p.communicate()
@@ -167,8 +137,6 @@ class Remote(APIView):
             running_code = int(os.environ.get("REMOTE_OK_CODE", 217))
             non_running_code = int(os.environ.get("REMOTE_NOT_OK_CODE", 218))
             log.trace(f"uuidcode={uuidcode} Exit code: {return_code}")
-            log.trace(f"uuidcode={uuidcode} Expected running exit code: {running_code}")
-            log.trace(f"uuidcode={uuidcode} Expected non running exit code: {non_running_code}")
             if return_code == running_code:
                 response = HttpResponse("True", status=200)
             elif return_code == non_running_code:
@@ -184,8 +152,7 @@ class Remote(APIView):
         try:
             uuidcode = request.headers.get('uuidcode', '<no_uuidcode>')
             log.info(f"uuidcode={uuidcode} Stop remote tunnel for {node}")
-            node = node_mapping(node)
-            cmd = ['timeout' , os.environ.get('SSHTIMEOUT', "3"), 'ssh', '-F', get_ssh_config_file(), f'remote_{node}', 'stop']
+            cmd = ['timeout' , os.environ.get('SSHTIMEOUT', "3"), 'ssh', '-F', os.environ.get('SSHCONFIGFILE', '~/.ssh/config'), f'remote_{node}', 'stop']
             log.trace("uuidcode={uuidcode} Stop Remote tunnel: {cmd}".format(uuidcode=uuidcode, cmd=' '.join(cmd)))
             p = Popen(cmd, stderr=PIPE, stdout=PIPE)
             p.communicate()
@@ -193,8 +160,6 @@ class Remote(APIView):
             running_code = int(os.environ.get("REMOTE_OK_CODE", 217))
             non_running_code = int(os.environ.get("REMOTE_NOT_OK_CODE", 218))
             log.trace(f"uuidcode={uuidcode} Exit code: {return_code}")
-            log.trace(f"uuidcode={uuidcode} Expected running exit code: {running_code}")
-            log.trace(f"uuidcode={uuidcode} Expected non running exit code: {non_running_code}")
             if return_code == running_code:
                 response = HttpResponse("False", status=200)
             elif return_code == non_running_code:
@@ -217,20 +182,11 @@ class Tunnel(APIView):
                 log.debug(f"uuidcode={uuidcode} No tunnel named {servername} in database.")
                 response = HttpResponse("False", status=200)
             else:
-                log.trace(f"uuidcode={uuidcode} Tunnel: {tunnel.servername};{tunnel.node};{tunnel.hostname};{tunnel.port1};{tunnel.port2};{tunnel.date}")
-                cmd = ['lsof', '-t' , f'-i:{tunnel.port1}']
-                log.trace("uuidcode={uuidcode} Check if something is listening: {cmd}".format(uuidcode=uuidcode, cmd=' '.join(cmd)))
-                p = Popen(cmd, stderr=PIPE, stdout=PIPE)
-                p.communicate()
-                return_code = p.returncode
-                log.trace(f"uuidcode={uuidcode} Return Code: {return_code}")
-                if return_code == 0:
+                if tunnel.is_running(uuidcode):
                     response = HttpResponse("True", status=200)
                     response["Location"] = f"{tunnel.servername};{tunnel.node};{tunnel.hostname};{tunnel.port1};{tunnel.port2};{tunnel.date}"
-                elif return_code == 1:
-                    response = HttpResponse("False", status=200)
                 else:
-                    raise Exception(f"lsof finished with non expected exit code: {return_code}")
+                    response = HttpResponse("False", status=200)
             return response
         except:
             log.exception("Bugfix required")
@@ -242,14 +198,25 @@ class Tunnel(APIView):
             log.info(f"uuidcode={uuidcode} Start Tunnel for {servername} {node} {hostname} {port1} {port2}")
             port_tunnel = Tunnels.objects.filter(port1=port1).first()
             if port_tunnel is not None:
-                log.error(f"uuidcode={uuidcode} Tunnel with port {port1} already exists")
-                return HttpResponse("False:port", status=200)
+                log.warning(f"uuidcode={uuidcode} Tunnel with port {port1} already exists")
+                trust_hub = os.environ.get("TRUST_HUB", "false").lower() in ('true', '1')
+                if trust_hub:
+                    port_tunnel.stop(uuidcode)
+                    port_tunnel.delete()
+                else:
+                    return HttpResponse("False:port", status=200)
             servername_tunnel = Tunnels.objects.filter(servername=servername).first()
             if servername_tunnel is not None:
-                log.error(f"uuidcode={uuidcode} Tunnel with servername {servername} already exists")
-                return HttpResponse("False:servername", status=200)
-            return_code = setup_tunnel(uuidcode, node, hostname, port1, port2)
-            log.trace("uuidcode={uuidcode} Return Code: {return_code}")
+                log.warning(f"uuidcode={uuidcode} Tunnel with servername {servername} already exists")
+                trust_hub = os.environ.get("TRUST_HUB", "false").lower() in ('true', '1')
+                if trust_hub:
+                    servername_tunnel.stop(uuidcode)
+                    servername_tunnel.delete()
+                else:
+                    return HttpResponse("False:servername", status=200)
+            
+            return_code = Tunnels.setup_tunnel(uuidcode, node, hostname, port1, port2)
+            log.trace(f"uuidcode={uuidcode} Return Code: {return_code}")
             if return_code == 0:
                 log.debug(f"uuidcode={uuidcode} Store in database")
                 tunnel = Tunnels(servername=servername, node=node, hostname=hostname, port1=port1, port2=port2)
@@ -266,22 +233,18 @@ class Tunnel(APIView):
         try:
             uuidcode = request.headers.get('uuidcode', '<no_uuidcode>')
             log.info(f"uuidcode={uuidcode} Stop Tunnel for {servername}")
+
             tunnel = Tunnels.objects.filter(servername=servername).first()
             if tunnel is None:
                 log.error(f"uuidcode={uuidcode} Could not find any tunnel for servername {servername}")
                 return HttpResponse("False:servername", status=200)
-            cmd = ['timeout' , os.environ.get('SSHTIMEOUT', "3"), 'ssh', '-F', get_ssh_config_file(), '-O', 'cancel', f'tunnel_{tunnel.node}', '-L', f'0.0.0.0:{tunnel.port1}:{tunnel.hostname}:{tunnel.port2}']
-            log.trace("uuidcode={uuidcode} Delete tunnel with: {cmd}".format(uuidcode=uuidcode, cmd=' '.join(cmd)))
-            p = Popen(cmd, stderr=PIPE, stdout=PIPE)
-            p.communicate()
-            return_code = p.returncode
-            log.trace(f"uuidcode={uuidcode} Return Code: {return_code}")
-            if return_code == 0:
-                log.info(f"uuidcode={uuidcode} Delete from database")
+
+            if tunnel.stop(uuidcode):
+                log.debug(f"uuidcode={uuidcode} Delete from database")
                 tunnel.delete()
                 response = HttpResponse("True", status=200)
             else:
-                raise Exception(f"ssh finished with non expected exit code: {return_code}")
+                response = HttpResponse("False", status=200)
             return response
         except:
             log.exception("Bugfix required")

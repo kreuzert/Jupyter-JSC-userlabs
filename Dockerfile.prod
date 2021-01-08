@@ -3,37 +3,49 @@
 FROM python:3.8.3-alpine
 
 # create directory for the app user
-RUN mkdir -p /home/app
-RUN mkdir -p /home/app/ssh_socket
+RUN mkdir -p /home/tunnel
+RUN mkdir -p /home/tunnel/ssh_socket
 
 # create the app user
-RUN addgroup --gid 1099 -S app && adduser --uid 1099 -S app -G app
+RUN addgroup --gid 1099 -S tunnel && adduser --uid 1099 -D tunnel -G tunnel && passwd -u tunnel
 
 # create the appropriate directories
-ENV HOME=/home/app
-ENV APP_HOME=/home/app/web
+ENV HOME=/home/tunnel
+ENV APP_HOME=/home/tunnel/web
 RUN mkdir $APP_HOME
 WORKDIR $APP_HOME
 
 # install dependencies
-#RUN apk update && apk add libpq bash curl python3 py3-pip py-zmq
-RUN apk update && apk add --no-cache openssh
+RUN apk update &&\
+    apk add --no-cache openssh rssh libpq &&\
+    sed -i -r "s/^#PasswordAuthentication yes/PasswordAuthentication no/g" /etc/ssh/sshd_config &&\
+    sed -i -r "s/^AllowTcpForwarding no/AllowTcpForwarding yes/g" /etc/ssh/sshd_config &&\
+    ssh-keygen -A
 
-COPY ./requirements.txt .
-RUN pip install -r requirements.txt 
+COPY ./app/requirements.txt .
+RUN apk update && \
+    apk add --no-cache --virtual .build-dependencies \
+        postgresql-dev \
+        gcc \
+        python3-dev \
+        musl-dev && \
+    pip install -r requirements.txt && \
+    apk del .build-dependencies
 
 # copy entrypoint-prod.sh
-COPY ./entrypoint.prod.sh $APP_HOME
+COPY ./app/entrypoint.prod.sh $APP_HOME
 
 # copy project
-COPY . $APP_HOME
+COPY app $APP_HOME
 
-# chown all the files to the app user
-RUN chown -R app:app $APP_HOME
-RUN chown -R app:app /home/app/ssh_socket
+# chown all the files to the tunnel user
+RUN chown -R tunnel:tunnel $APP_HOME
+RUN chown -R tunnel:tunnel /home/tunnel/ssh_socket
 
 # change to the app user
-USER app
+# USER app
+
+EXPOSE 22
 
 # run entrypoint.prod.sh
-ENTRYPOINT ["/home/app/web/entrypoint.prod.sh"]
+ENTRYPOINT ["/home/tunnel/web/entrypoint.prod.sh"]
