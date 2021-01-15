@@ -18,4 +18,4 @@ if [ "$DATABASE" = "postgres" ]; then
     echo "PostgreSQL started"
 fi
 
-su tunnel -c "cd /home/tunnel/web && /usr/local/bin/gunicorn -w 1 --bind 0.0.0.0 tunnel.wsgi"
+su app -c "cd /home/app/web && /usr/local/bin/gunicorn -w 4 --bind 0.0.0.0 userlab.wsgi"

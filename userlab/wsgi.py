@@ -1,5 +1,5 @@
 """
-WSGI config for tunnel project.
+WSGI config for userlab project.
 
 It exposes the WSGI callable as a module-level variable named ``application``.
 
@@ -10,6 +10,6 @@ import os
 
 from django.core.wsgi import get_wsgi_application
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "tunnel.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "userlab.settings")
 
 application = get_wsgi_application()
